@@ -54,11 +54,11 @@ export async function POST(request: NextRequest) {
         waitUntil: 'domcontentloaded',
         timeout: 60000 
       });
-    } catch (error) {
+    } catch {
       // If domcontentloaded fails, try with load
-      await page.goto(url, { 
+      await page.goto(url, {
         waitUntil: 'load',
-        timeout: 45000 
+        timeout: 45000
       });
     }
 
