@@ -20,6 +20,10 @@ export interface ExplorationResult {
   success: boolean;
   error?: string;
   totalScrollHeight?: number;
+  signInDetected?: boolean;
+  authenticationCompleted?: boolean;
+  postAuthScreenshots?: ScreenshotResult[];
+  liveViewUrl?: string;
 }
 
 export interface ScreenshotStatus {
@@ -28,8 +32,10 @@ export interface ScreenshotStatus {
 }
 
 export interface ExplorationStatus {
-  status: 'idle' | 'loading' | 'exploring' | 'complete' | 'error';
+  status: 'idle' | 'loading' | 'exploring' | 'waiting_auth' | 'post_auth' | 'complete' | 'error';
   result?: ExplorationResult;
   currentStep?: string;
   progress?: number;
+  liveViewUrl?: string;
+  authMessage?: string;
 }

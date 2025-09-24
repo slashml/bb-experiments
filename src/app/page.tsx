@@ -1,244 +1,228 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import UrlInput from '../components/UrlInput';
-import ScreenshotViewer from '../components/ScreenshotViewer';
-import ExplorationViewer from '../components/ExplorationViewer';
-import { ScreenshotStatus, ExplorationStatus } from '../lib/types';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { useState } from 'react';
 
 export default function Home() {
-  const [url, setUrl] = useState<string>('');
-  const [processing, setProcessing] = useState(false);
-  const [mode, setMode] = useState<'screenshot' | 'explore'>('explore');
-  const [status, setStatus] = useState<ScreenshotStatus>({
-    status: 'idle'
-  });
-  const [explorationStatus, setExplorationStatus] = useState<ExplorationStatus>({
-    status: 'idle'
-  });
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isHovering, setIsHovering] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (status.status === 'complete' || status.status === 'error' ||
-        explorationStatus.status === 'complete' || explorationStatus.status === 'error') {
-      scrollContainerRef.current?.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+  const features = [
+    {
+      id: 'ai-automation',
+      icon: '🤖',
+      title: 'AI-Powered Automation',
+      description: 'Stagehand AI intelligently navigates and analyzes SaaS platforms',
+      details: ['Smart element detection', 'Autonomous page exploration', 'Natural language instructions']
+    },
+    {
+      id: 'real-time',
+      icon: '⚡',
+      title: 'Real-Time Progress',
+      description: 'Watch AI work in real-time with live progress tracking and screenshots',
+      details: ['Live browser view', 'Progress visualization', 'Screenshot gallery']
+    },
+    {
+      id: 'structured-docs',
+      icon: '📋',
+      title: 'Structured Documentation',
+      description: 'Generate comprehensive docs with organized sections and insights',
+      details: ['Markdown export', 'Shareable URLs', 'Professional formatting']
     }
-  }, [status.status, explorationStatus.status]);
+  ];
 
-  const isValidUrl = (urlString: string): boolean => {
-    try {
-      new URL(urlString);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const canStart = url.trim().length > 0 && isValidUrl(url) && !processing;
-
-  const captureScreenshot = async () => {
-    if (!canStart) return;
-
-    setProcessing(true);
-    setStatus({ status: 'loading' });
-    setExplorationStatus({ status: 'idle' }); // Reset exploration status
-
-    try {
-      const response = await fetch('/api/screenshot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setStatus({
-          status: 'complete',
-          result: result.screenshot
-        });
-      } else {
-        setStatus({
-          status: 'error',
-          result: {
-            url,
-            screenshotUrl: '',
-            timestamp: new Date().toISOString(),
-            success: false,
-            error: result.error || 'Failed to capture screenshot'
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Failed to capture screenshot:', error);
-      setStatus({
-        status: 'error',
-        result: {
-          url,
-          screenshotUrl: '',
-          timestamp: new Date().toISOString(),
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const explorePage = async () => {
-    if (!canStart) return;
-
-    setProcessing(true);
-    setExplorationStatus({ status: 'loading', currentStep: 'Initializing browser...' });
-    setStatus({ status: 'idle' }); // Reset screenshot status
-
-    try {
-      const response = await fetch('/api/explore', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setExplorationStatus({
-          status: 'complete',
-          result: result.exploration
-        });
-      } else {
-        setExplorationStatus({
-          status: 'error',
-          result: {
-            url,
-            screenshots: [],
-            timestamp: new Date().toISOString(),
-            success: false,
-            error: result.error || 'Failed to explore page'
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Failed to explore page:', error);
-      setExplorationStatus({
-        status: 'error',
-        result: {
-          url,
-          screenshots: [],
-          timestamp: new Date().toISOString(),
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
+  const platforms = [
+    { name: 'Notion', color: 'from-gray-700 to-gray-900' },
+    { name: 'Linear', color: 'from-blue-500 to-purple-600' },
+    { name: 'Airtable', color: 'from-yellow-400 to-orange-500' },
+    { name: 'Figma', color: 'from-pink-400 to-red-500' },
+    { name: 'Stripe', color: 'from-indigo-500 to-blue-600' },
+    { name: 'Vercel', color: 'from-black to-gray-700' }
+  ];
 
   return (
-    <div className="h-screen bg-gray-50 overflow-hidden">
-      <div ref={scrollContainerRef} className="h-full max-w-4xl mx-auto px-4 py-8 overflow-y-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            SaaS Landing Page Explorer
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
+      {/* Hero Section */}
+      <div className="container mx-auto px-4 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-16"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring" }}
+            className="inline-block p-4 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full mb-6"
+          >
+            <span className="text-4xl">🚀</span>
+          </motion.div>
+
+          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-6">
+            SaaS Docs Generator
           </h1>
-          <p className="text-gray-600">
-            Enter a SaaS product URL and either capture a single screenshot or explore the entire page autonomously
+
+          <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto mb-8">
+            AI-powered documentation generator for SaaS platforms using
+            <span className="font-semibold text-purple-600"> Browserbase + Stagehand</span>
           </p>
-        </div>
 
-        {/* Main Content */}
-        <div className="space-y-8">
-          {/* Input Section */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <UrlInput
-              onUrlChange={setUrl}
-              disabled={processing}
-            />
+          <p className="text-purple-600 font-semibold mb-8">
+            🎯 Live Demo for AI Tinkerers Montreal
+          </p>
 
-            {/* Mode Selection */}
-            <div className="mt-6">
-              <div className="flex justify-center space-x-1 bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setMode('explore')}
-                  disabled={processing}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    mode === 'explore'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  } disabled:cursor-not-allowed`}
-                >
-                  🔍 Autonomous Exploration
-                </button>
-                <button
-                  onClick={() => setMode('screenshot')}
-                  disabled={processing}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    mode === 'screenshot'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  } disabled:cursor-not-allowed`}
-                >
-                  📸 Single Screenshot
-                </button>
-              </div>
-            </div>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Link
+              href="/demo"
+              className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg rounded-lg shadow-xl hover:from-purple-700 hover:to-pink-700 transition-all"
+            >
+              ✨ Try the Demo
+              <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </Link>
+          </motion.div>
+        </motion.div>
 
-            <div className="mt-6 text-center">
-              {mode === 'explore' ? (
-                <div>
-                  <button
-                    onClick={explorePage}
-                    disabled={!canStart}
-                    className="px-8 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {processing ? 'Exploring Page...' : '🚀 Explore Page Autonomously'}
-                  </button>
-                  <p className="text-sm text-gray-600 mt-2">
-                    Automatically scroll through the page and capture multiple screenshots
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <button
-                    onClick={captureScreenshot}
-                    disabled={!canStart}
-                    className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {processing ? 'Capturing Screenshot...' : '📸 Capture Single Screenshot'}
-                  </button>
-                  <p className="text-sm text-gray-600 mt-2">
-                    Take a single full-page screenshot
-                  </p>
-                </div>
-              )}
+        {/* Features Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16"
+        >
+          {features.map((feature, index) => (
+            <motion.div
+              key={feature.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 + index * 0.1 }}
+              className="relative bg-white rounded-xl p-6 shadow-lg border border-purple-100 hover:shadow-xl transition-all cursor-pointer"
+              onMouseEnter={() => setIsHovering(feature.id)}
+              onMouseLeave={() => setIsHovering(null)}
+              whileHover={{ y: -5 }}
+            >
+              <div className="text-4xl mb-4">{feature.icon}</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
+              <p className="text-gray-600 mb-4">{feature.description}</p>
 
-              {!canStart && !processing && (
-                <p className="text-sm text-gray-500 mt-3">
-                  Please enter a valid URL to continue
-                </p>
-              )}
-            </div>
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{
+                  opacity: isHovering === feature.id ? 1 : 0,
+                  height: isHovering === feature.id ? 'auto' : 0
+                }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <ul className="space-y-1">
+                  {feature.details.map((detail, idx) => (
+                    <li key={idx} className="text-sm text-purple-600 flex items-center">
+                      <span className="w-1.5 h-1.5 bg-purple-400 rounded-full mr-2"></span>
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Supported Platforms */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl font-bold text-gray-900 mb-8">
+            Demo Platforms
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            {platforms.map((platform, index) => (
+              <motion.div
+                key={platform.name}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.9 + index * 0.05 }}
+                className={`bg-gradient-to-r ${platform.color} text-white p-4 rounded-lg font-semibold text-center shadow-lg hover:scale-105 transition-transform`}
+              >
+                {platform.name}
+              </motion.div>
+            ))}
           </div>
+          <p className="text-gray-600 mt-6">
+            Choose any platform in the demo to see AI generate comprehensive documentation
+          </p>
+        </motion.div>
 
-          {/* Results Section */}
-          <ScreenshotViewer status={status} />
-          <ExplorationViewer status={explorationStatus} />
-        </div>
+        {/* How it Works */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1 }}
+          className="bg-white rounded-xl p-8 shadow-lg border border-purple-100 mb-16"
+        >
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-8">
+            How It Works
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[
+              { step: '1', title: 'Select Platform', desc: 'Choose a SaaS platform to analyze' },
+              { step: '2', title: 'AI Navigation', desc: 'Stagehand AI explores the platform intelligently' },
+              { step: '3', title: 'Real-time Progress', desc: 'Watch live screenshots and progress updates' },
+              { step: '4', title: 'Get Documentation', desc: 'Download or share the generated docs' }
+            ].map((item, index) => (
+              <div key={index} className="text-center">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-xl rounded-full flex items-center justify-center mx-auto mb-4">
+                  {item.step}
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">{item.title}</h3>
+                <p className="text-gray-600 text-sm">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* CTA Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.2 }}
+          className="text-center bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl p-12 shadow-xl"
+        >
+          <h2 className="text-4xl font-bold mb-4">
+            Ready to See AI in Action?
+          </h2>
+          <p className="text-xl mb-8 opacity-90">
+            Experience the future of automated documentation generation
+          </p>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Link
+              href="/demo"
+              className="inline-flex items-center px-8 py-4 bg-white text-purple-600 font-bold text-lg rounded-lg shadow-lg hover:bg-gray-50 transition-all"
+            >
+              🚀 Launch Demo
+              <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </Link>
+          </motion.div>
+        </motion.div>
 
         {/* Footer */}
-        <footer className="mt-12 text-center text-sm text-gray-500 border-t pt-8">
+        <footer className="mt-16 text-center text-sm text-gray-500 border-t pt-8">
+          <p className="mb-2">
+            Built with Next.js, Stagehand AI, and Browserbase
+          </p>
           <p>
-            Built with Next.js and Playwright for automated SaaS landing page exploration and screenshots.
+            {new Date().getFullYear()} AI Tinkerers Montreal Demo
           </p>
         </footer>
       </div>
