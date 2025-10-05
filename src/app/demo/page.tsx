@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEMO_PLATFORMS } from '../../lib/platforms';
 import { PlatformConfig, SessionProgress } from '../../lib/schemas';
@@ -9,12 +10,13 @@ import LiveProgress from './components/LiveProgress';
 import DocumentationViewer from './components/DocumentationViewer';
 
 export default function DemoPage() {
+  const searchParams = useSearchParams();
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformConfig | null>(null);
   const [sessionProgress, setSessionProgress] = useState<SessionProgress | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [documentation, setDocumentation] = useState<any>(null);
 
-  const startDocumentation = async (platform: PlatformConfig) => {
+  const startDocumentation = useCallback(async (platform: PlatformConfig) => {
     setSelectedPlatform(platform);
     setIsGenerating(true);
     setSessionProgress(null);
@@ -84,7 +86,7 @@ export default function DemoPage() {
       console.error('Error starting documentation generation:', error);
       setIsGenerating(false);
     }
-  };
+  }, []);
 
   const fetchDocumentation = async (sessionId: string) => {
     try {
@@ -131,6 +133,32 @@ export default function DemoPage() {
     setDocumentation(null);
   };
 
+  // Check for URL parameter on component mount
+  useEffect(() => {
+    const urlParam = searchParams.get('url');
+    if (urlParam) {
+      // Extract domain name for platform name
+      try {
+        const urlObj = new URL(urlParam);
+        const domain = urlObj.hostname.replace('www.', '');
+        const platformName = domain.split('.')[0] || domain;
+
+        const customPlatform: PlatformConfig = {
+          name: platformName.charAt(0).toUpperCase() + platformName.slice(1),
+          url: urlParam,
+          description: `Custom platform analysis for ${domain}`,
+          complexity: "Medium",
+          estimatedTime: "3-5 minutes"
+        };
+
+        // Automatically start documentation generation
+        startDocumentation(customPlatform);
+      } catch (error) {
+        console.error('Invalid URL provided:', error);
+      }
+    }
+  }, [searchParams, startDocumentation]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
       <div className="container mx-auto px-4 py-8">
@@ -144,7 +172,7 @@ export default function DemoPage() {
             🤖 SaaS Docs Generator
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            AI-powered documentation generator for SaaS platforms using Browserbase + Stagehand
+            AI-powered documentation generator for any website using Browserbase + Stagehand
           </p>
           <p className="text-sm text-purple-600 mt-2 font-semibold">
             Live Demo for AI Tinkerers Montreal
@@ -199,38 +227,6 @@ export default function DemoPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Demo Features */}
-        {!isGenerating && !documentation && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8"
-          >
-            <div className="text-center p-6 bg-white rounded-lg shadow-sm border border-purple-100">
-              <div className="text-3xl mb-3">🎯</div>
-              <h3 className="font-semibold text-gray-900 mb-2">AI-Powered Navigation</h3>
-              <p className="text-gray-600 text-sm">
-                Stagehand AI intelligently explores SaaS platforms, finding features and flows
-              </p>
-            </div>
-            <div className="text-center p-6 bg-white rounded-lg shadow-sm border border-purple-100">
-              <div className="text-3xl mb-3">📸</div>
-              <h3 className="font-semibold text-gray-900 mb-2">Live Screenshots</h3>
-              <p className="text-gray-600 text-sm">
-                Real-time screenshot capture with Browserbase infrastructure
-              </p>
-            </div>
-            <div className="text-center p-6 bg-white rounded-lg shadow-sm border border-purple-100">
-              <div className="text-3xl mb-3">📋</div>
-              <h3 className="font-semibold text-gray-900 mb-2">Structured Docs</h3>
-              <p className="text-gray-600 text-sm">
-                Automatically generated documentation with structured data extraction
-              </p>
-            </div>
-          </motion.div>
-        )}
 
         {/* Footer */}
         <motion.footer

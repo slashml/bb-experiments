@@ -92,6 +92,7 @@ export const SessionProgressSchema = z.object({
   overallProgress: z.number().min(0).max(100),
   liveViewUrl: z.string().optional(),
   replayUrl: z.string().optional(),
+  browserbaseSessionId: z.string().optional(),
   startTime: z.string(),
   estimatedEndTime: z.string().optional()
 });

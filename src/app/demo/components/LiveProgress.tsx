@@ -12,6 +12,7 @@ interface LiveProgressProps {
 
 export default function LiveProgress({ platform, progress, onReset }: LiveProgressProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'live' | 'screenshots'>('live');
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -77,6 +78,21 @@ export default function LiveProgress({ platform, progress, onReset }: LiveProgre
           <h3 className="text-lg font-semibold text-gray-900">Overall Progress</h3>
           <div className="flex items-center space-x-4 text-sm text-gray-600">
             <span>Session: {progress?.sessionId?.slice(-8) || 'Starting...'}</span>
+            {progress?.browserbaseSessionId && (
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-gray-500">BB:</span>
+                <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
+                  {progress.browserbaseSessionId.slice(-8)}
+                </code>
+                <button
+                  onClick={() => navigator.clipboard.writeText(progress.browserbaseSessionId!)}
+                  className="text-purple-600 hover:text-purple-800 text-xs"
+                  title="Copy full Browserbase session ID"
+                >
+                  📋
+                </button>
+              </div>
+            )}
             {progress?.status === 'failed' && (
               <span className="text-red-600 font-medium">⚠️ Demo Limited (Billing)</span>
             )}
@@ -199,8 +215,92 @@ export default function LiveProgress({ platform, progress, onReset }: LiveProgre
           transition={{ delay: 0.4 }}
           className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
         >
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Live Screenshots</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {viewMode === 'live' ? 'Live Browser View' : 'Captured Screenshots'}
+            </h3>
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('live')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'live'
+                    ? 'bg-white text-purple-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                👁️ Live View
+              </button>
+              <button
+                onClick={() => setViewMode('screenshots')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'screenshots'
+                    ? 'bg-white text-purple-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                📸 Screenshots
+              </button>
+            </div>
+          </div>
+
+          {/* Live Browser View */}
+          {viewMode === 'live' && progress?.liveViewUrl && (
+            <div className="space-y-4">
+              {/* Authentication Notice */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="text-amber-600 text-lg">ℹ️</div>
+                  <div>
+                    <h4 className="text-sm font-medium text-amber-800 mb-1">Live Session Authentication</h4>
+                    <p className="text-xs text-amber-700 mb-2">
+                      The live browser session runs in an isolated environment and doesn't share your login cookies.
+                      This is normal security behavior for embedded browser sessions.
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <a
+                        href={progress.liveViewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 transition-colors"
+                      >
+                        🚀 Open Live Session
+                      </a>
+                      <span className="text-amber-600">← Login here to see authenticated features</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live View iframe */}
+              <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
+                <iframe
+                  src={progress.liveViewUrl}
+                  className="w-full h-full rounded-lg border border-gray-200"
+                  allow="camera; microphone; clipboard-read; clipboard-write"
+                  title="Live Browser Session"
+                />
+                <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-medium flex items-center">
+                  <div className="w-2 h-2 bg-white rounded-full mr-1 animate-pulse"></div>
+                  LIVE
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Live View Placeholder */}
+          {viewMode === 'live' && !progress?.liveViewUrl && (
+            <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="text-center text-gray-500">
+                <div className="text-4xl mb-2">🌐</div>
+                <p className="font-medium">Starting Live Browser Session...</p>
+                <p className="text-sm">Live view will appear once AI begins exploring</p>
+              </div>
+            </div>
+          )}
+
+          {/* Screenshots Grid */}
+          {viewMode === 'screenshots' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <AnimatePresence>
               {progress.tasks
                 .flatMap(task => task.screenshots || [])
@@ -226,9 +326,11 @@ export default function LiveProgress({ platform, progress, onReset }: LiveProgre
                 </motion.div>
               ))}
             </AnimatePresence>
-          </div>
+            </div>
+          )}
 
-          {progress.tasks.every(task => task.screenshots?.length === 0) && (
+          {/* Screenshots Placeholder */}
+          {viewMode === 'screenshots' && progress.tasks.every(task => task.screenshots?.length === 0) && (
             <div className="text-center py-8 text-gray-500">
               <div className="text-4xl mb-2">📸</div>
               <p>Screenshots will appear here as AI explores the platform</p>

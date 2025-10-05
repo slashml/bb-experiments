@@ -13,6 +13,58 @@ interface PlatformSelectorProps {
 export default function PlatformSelector({ platforms, onSelectPlatform, isGenerating }: PlatformSelectorProps) {
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformConfig | null>(null);
   const [isHovering, setIsHovering] = useState<string | null>(null);
+  const [customUrl, setCustomUrl] = useState('');
+  const [urlError, setUrlError] = useState('');
+  const [useCustomUrl, setUseCustomUrl] = useState(false);
+
+  const validateUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleSelect = (platform: PlatformConfig) => {
+    if (isGenerating) return;
+    setSelectedPlatform(platform);
+    setUseCustomUrl(false);
+  };
+
+  const handleCustomUrlSubmit = () => {
+    if (isGenerating) return;
+
+    setUrlError('');
+
+    if (!customUrl.trim()) {
+      setUrlError('Please enter a URL');
+      return;
+    }
+
+    let finalUrl = customUrl.trim();
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
+    }
+
+    if (!validateUrl(finalUrl)) {
+      setUrlError('Please enter a valid URL');
+      return;
+    }
+
+    const customPlatform: PlatformConfig = {
+      id: 'custom',
+      name: new URL(finalUrl).hostname.replace('www.', ''),
+      url: finalUrl,
+      description: 'Custom platform provided by user',
+      complexity: 'Medium',
+      estimatedTime: '5-10 min'
+    };
+
+    setSelectedPlatform(customPlatform);
+    setUseCustomUrl(true);
+    setTimeout(() => onSelectPlatform(customPlatform), 300);
+  };
 
   const getComplexityColor = (complexity: string) => {
     switch (complexity) {
@@ -34,86 +86,49 @@ export default function PlatformSelector({ platforms, onSelectPlatform, isGenera
 
   return (
     <div className="max-w-6xl mx-auto">
+      {/* Custom URL Input */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+        transition={{ delay: 0.3 }}
+        className="bg-white rounded-xl border-2 border-purple-200 p-6 mb-8"
       >
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Choose a SaaS Platform to Document
-        </h2>
-        <p className="text-gray-600">
-          Select a platform and watch AI automatically generate comprehensive documentation
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          🌐 Enter Your Own URL
+        </h3>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={customUrl}
+              onChange={(e) => setCustomUrl(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleCustomUrlSubmit()}
+              placeholder="https://example.com or example.com"
+              className={`w-full px-4 py-3 border-2 rounded-lg transition-colors ${
+                urlError ? 'border-red-300 bg-red-50' : 'border-gray-200 focus:border-purple-500'
+              } focus:outline-none`}
+              disabled={isGenerating}
+            />
+            {urlError && (
+              <p className="text-red-600 text-sm mt-2">⚠️ {urlError}</p>
+            )}
+          </div>
+          <button
+            onClick={handleCustomUrlSubmit}
+            disabled={isGenerating || !customUrl.trim()}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+              customUrl.trim() && !isGenerating
+                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            {isGenerating ? '🔄' : '🚀 Analyze'}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          💡 Enter any website URL - the AI will explore and document its features
         </p>
       </motion.div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {platforms.map((platform, index) => (
-          <motion.div
-            key={platform.name}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className={`relative p-6 rounded-xl border-2 transition-all cursor-pointer ${
-              selectedPlatform?.name === platform.name
-                ? 'border-purple-500 bg-purple-50 shadow-lg'
-                : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
-            }`}
-            onClick={() => setSelectedPlatform(platform)}
-            onMouseEnter={() => setIsHovering(platform.name)}
-            onMouseLeave={() => setIsHovering(null)}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {/* Complexity indicator */}
-            <div className="absolute top-3 right-3">
-              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getComplexityColor(platform.complexity)}`}>
-                {getComplexityEmoji(platform.complexity)} {platform.complexity}
-              </span>
-            </div>
-
-            <div className="mb-4">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {platform.name}
-              </h3>
-              <p className="text-gray-600 text-sm mb-3">
-                {platform.description}
-              </p>
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>⏱️ {platform.estimatedTime}</span>
-                <span>{platform.url.replace('https://', '').replace('www.', '')}</span>
-              </div>
-            </div>
-
-            {platform.specialFeatures && (
-              <div className="mb-4">
-                <p className="text-xs font-medium text-gray-700 mb-2">Key Features:</p>
-                <div className="flex flex-wrap gap-1">
-                  {platform.specialFeatures.slice(0, 3).map((feature, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-block px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded"
-                    >
-                      {feature}
-                    </span>
-                  ))}
-                  {platform.specialFeatures.length > 3 && (
-                    <span className="inline-block px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                      +{platform.specialFeatures.length - 3} more
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: isHovering === platform.name ? 1 : 0 }}
-              className="absolute inset-0 bg-purple-500 bg-opacity-5 rounded-xl pointer-events-none"
-            />
-          </motion.div>
-        ))}
-      </div>
 
       {/* Start Button */}
       <motion.div

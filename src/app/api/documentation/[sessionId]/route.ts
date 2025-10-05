@@ -17,8 +17,8 @@ export async function GET(
 
     console.log(`[Documentation API] Fetching documentation for session: ${sessionId}`);
 
-    // Get documentation from session store
-    const documentation = sessionStore.getDocumentation(sessionId);
+    // Get documentation from file storage
+    const documentation = await sessionStore.getDocumentation(sessionId);
     const session = sessionStore.getSession(sessionId);
 
     if (!documentation) {

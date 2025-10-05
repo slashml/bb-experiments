@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       projectId: process.env.BROWSERBASE_PROJECT_ID,
       modelApiKey: process.env.OPENAI_API_KEY, // For AI features
       enableStealth: true,
-      headless: true
+      headless: false // Keep browser visible for user interactions
     });
 
     await stagehand.init();
@@ -69,6 +69,56 @@ export async function POST(request: NextRequest) {
       scrollPosition: 0,
       description: 'Stagehand initial capture - Landing page view'
     });
+
+    // Check for authentication elements first
+    let signInDetected = false;
+    let authenticationCompleted = false;
+    const postAuthScreenshots: ScreenshotResult[] = [];
+
+    console.log('[Stagehand] Checking for authentication elements...');
+    try {
+      // Use AI to detect login/signin elements
+      await stagehand.page.act('find and click the sign in, login, or get started button');
+      signInDetected = true;
+      console.log('[Stagehand] AI found and clicked authentication element');
+
+      // Wait for authentication page to load
+      await stagehand.page.waitForTimeout(3000);
+
+      // Take screenshot of auth page
+      screenshotBuffer = await stagehand.page.screenshot({
+        fullPage: false,
+        type: 'png'
+      });
+      screenshotBase64 = screenshotBuffer.toString('base64');
+      screenshotDataUrl = `data:image/png;base64,${screenshotBase64}`;
+
+      screenshots.push({
+        url: stagehand.page.url(),
+        screenshotUrl: screenshotDataUrl,
+        timestamp: new Date().toISOString(),
+        success: true,
+        scrollPosition: -2,
+        description: 'Authentication page - Please complete login manually'
+      });
+
+      // Wait for user authentication
+      console.log('[Stagehand] Waiting for user to complete authentication...');
+      const authResult = await waitForAuthentication(stagehand);
+
+      if (authResult.success) {
+        authenticationCompleted = true;
+        console.log(`[Stagehand] Authentication completed! Current URL: ${stagehand.page.url()}`);
+
+        // Capture authenticated content
+        await captureAuthenticatedContent(stagehand, postAuthScreenshots);
+      } else {
+        console.log('[Stagehand] Authentication timed out, continuing with public content...');
+      }
+
+    } catch (authError) {
+      console.log('[Stagehand] No authentication elements found or auth failed, continuing with public exploration:', authError);
+    }
 
     // Use Stagehand's observe method to understand the page
     console.log('[Stagehand] Using AI to observe page elements...');
@@ -160,7 +210,10 @@ export async function POST(request: NextRequest) {
       screenshots,
       timestamp: new Date().toISOString(),
       success: true,
-      liveViewUrl: url
+      signInDetected,
+      authenticationCompleted,
+      postAuthScreenshots,
+      liveViewUrl: stagehand.page.url()
     };
 
     console.log(`[Stagehand] Exploration completed with ${screenshots.length} screenshots`);
@@ -212,5 +265,117 @@ export async function POST(request: NextRequest) {
       error: errorMessage,
       method: 'stagehand'
     }, { status: statusCode });
+  }
+}
+
+async function waitForAuthentication(stagehand: Stagehand, maxWaitTime: number = 300000) {
+  const startTime = Date.now();
+  const initialUrl = stagehand.page.url();
+
+  while (Date.now() - startTime < maxWaitTime) {
+    try {
+      const currentUrl = stagehand.page.url();
+
+      // Check if we're no longer on a login page
+      const isStillOnLogin = await stagehand.page.evaluate(() => {
+        const url = window.location.href.toLowerCase();
+        const title = document.title.toLowerCase();
+        const bodyText = document.body.textContent?.toLowerCase() || '';
+
+        const isLoginPage = url.includes('login') || url.includes('signin') || url.includes('auth') ||
+                           title.includes('login') || title.includes('sign in') ||
+                           bodyText.includes('enter your password') || bodyText.includes('sign in');
+
+        return isLoginPage;
+      });
+
+      // Check for authentication success indicators
+      const authSuccess = await stagehand.page.evaluate(() => {
+        const url = window.location.href.toLowerCase();
+        const bodyText = document.body.textContent?.toLowerCase() || '';
+
+        return url.includes('dashboard') || url.includes('/app') || url.includes('/home') ||
+               bodyText.includes('welcome') || bodyText.includes('dashboard') ||
+               !!document.querySelector('a[href*="logout"], .logout, [data-testid*="logout"]');
+      });
+
+      if (!isStillOnLogin && (currentUrl !== initialUrl || authSuccess)) {
+        console.log('[Stagehand] Authentication success detected');
+        return { success: true, finalUrl: currentUrl };
+      }
+
+      // Wait before next check
+      await stagehand.page.waitForTimeout(5000);
+
+    } catch (error) {
+      console.log('[Stagehand] Error during authentication wait:', error);
+      await stagehand.page.waitForTimeout(5000);
+    }
+  }
+
+  return { success: false, error: 'Authentication timeout' };
+}
+
+async function captureAuthenticatedContent(stagehand: Stagehand, postAuthScreenshots: ScreenshotResult[]) {
+  const currentUrl = stagehand.page.url();
+
+  // Take initial authenticated screenshot
+  console.log('[Stagehand] Capturing authenticated content...');
+  let screenshotBuffer = await stagehand.page.screenshot({
+    fullPage: false,
+    type: 'png'
+  });
+  let screenshotBase64 = screenshotBuffer.toString('base64');
+  let screenshotDataUrl = `data:image/png;base64,${screenshotBase64}`;
+
+  postAuthScreenshots.push({
+    url: currentUrl,
+    screenshotUrl: screenshotDataUrl,
+    timestamp: new Date().toISOString(),
+    success: true,
+    scrollPosition: 0,
+    description: '🔐 Authenticated dashboard - Main view after login'
+  });
+
+  // Use Stagehand AI to explore authenticated content
+  try {
+    await stagehand.page.act('scroll down to see more content');
+    await stagehand.page.waitForTimeout(3000);
+
+    screenshotBuffer = await stagehand.page.screenshot({
+      fullPage: false,
+      type: 'png'
+    });
+    screenshotBase64 = screenshotBuffer.toString('base64');
+    screenshotDataUrl = `data:image/png;base64,${screenshotBase64}`;
+
+    postAuthScreenshots.push({
+      url: currentUrl,
+      screenshotUrl: screenshotDataUrl,
+      timestamp: new Date().toISOString(),
+      success: true,
+      scrollPosition: 1,
+      description: '🔐 Authenticated content - AI-guided scroll view'
+    });
+
+    // Take full page authenticated screenshot
+    const fullPageScreenshot = await stagehand.page.screenshot({
+      fullPage: true,
+      type: 'png'
+    });
+    const fullPageBase64 = fullPageScreenshot.toString('base64');
+    const fullPageDataUrl = `data:image/png;base64,${fullPageBase64}`;
+
+    postAuthScreenshots.push({
+      url: currentUrl,
+      screenshotUrl: fullPageDataUrl,
+      timestamp: new Date().toISOString(),
+      success: true,
+      scrollPosition: -1,
+      description: '🔐 Complete authenticated page - Full authenticated view'
+    });
+
+  } catch (error) {
+    console.log('[Stagehand] Error capturing additional authenticated content:', error);
   }
 }

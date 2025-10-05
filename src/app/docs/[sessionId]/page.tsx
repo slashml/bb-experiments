@@ -9,8 +9,8 @@ interface DocsPageProps {
 export default async function DocsPage({ params }: DocsPageProps) {
   const { sessionId } = await params;
 
-  // Get documentation from session store
-  const documentation = sessionStore.getDocumentation(sessionId);
+  // Get documentation from file storage
+  const documentation = await sessionStore.getDocumentation(sessionId);
   const sessionProgress = sessionStore.getSession(sessionId);
 
   if (!documentation) {
@@ -58,7 +58,7 @@ export default async function DocsPage({ params }: DocsPageProps) {
 
 export async function generateMetadata({ params }: DocsPageProps) {
   const { sessionId } = await params;
-  const documentation = sessionStore.getDocumentation(sessionId);
+  const documentation = await sessionStore.getDocumentation(sessionId);
 
   if (!documentation) {
     return {

@@ -14,8 +14,14 @@ export async function GET(request: NextRequest) {
   const stream = new ReadableStream({
     start(controller) {
       console.log(`[SSE] Starting progress stream for session: ${sessionId}`);
+      let isClosed = false;
 
       const sendUpdate = () => {
+        // Check if controller is already closed
+        if (isClosed) {
+          return;
+        }
+
         try {
           // Get session progress from the shared session store
           const progress = sessionStore.getSession(sessionId);
@@ -27,6 +33,7 @@ export async function GET(request: NextRequest) {
             // If completed or failed, close the stream
             if (progress.status === 'completed' || progress.status === 'failed') {
               console.log(`[SSE] Session ${sessionId} ${progress.status}, closing stream`);
+              isClosed = true;
               controller.close();
               return;
             }
@@ -37,7 +44,14 @@ export async function GET(request: NextRequest) {
           }
         } catch (error) {
           console.error(`[SSE] Error sending update for session ${sessionId}:`, error);
-          controller.error(error);
+          if (!isClosed) {
+            isClosed = true;
+            try {
+              controller.error(error);
+            } catch (controllerError) {
+              console.error(`[SSE] Controller error while handling error:`, controllerError);
+            }
+          }
         }
       };
 
@@ -49,6 +63,7 @@ export async function GET(request: NextRequest) {
 
       // Clean up on close
       const cleanup = () => {
+        isClosed = true;
         clearInterval(interval);
         console.log(`[SSE] Cleaned up interval for session: ${sessionId}`);
       };

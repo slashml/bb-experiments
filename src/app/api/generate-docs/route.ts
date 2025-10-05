@@ -138,9 +138,93 @@ async function processDocumentationGeneration(sessionId: string, platformName: s
     await stagehand.init();
     console.log(`[SaaS Docs] ${sessionId}: Stagehand initialized successfully`);
 
-    // Get live view URL
-    const liveViewUrl = `https://www.browserbase.com/sessions/${(stagehand as any).sessionId}`;
-    session.liveViewUrl = liveViewUrl;
+    // Get the Browserbase session ID from the initialized Stagehand instance
+    let browserbaseSessionId: string | undefined;
+
+    // Try multiple methods to get the session ID
+    try {
+      // Method 1: Check if sessionId is available directly on the stagehand instance
+      browserbaseSessionId = (stagehand as any).sessionId;
+
+      // Method 2: Check various common properties where session ID might be stored
+      if (!browserbaseSessionId) {
+        const possiblePaths = [
+          (stagehand as any).session?.id,
+          (stagehand as any).browser?.sessionId,
+          (stagehand as any).context?.sessionId,
+          (stagehand as any).page?.sessionId,
+          (stagehand as any)._sessionId,
+          (stagehand as any).browserbaseSessionId
+        ];
+
+        for (const path of possiblePaths) {
+          if (path && typeof path === 'string') {
+            browserbaseSessionId = path;
+            console.log(`[SaaS Docs] ${sessionId}: Found session ID via property path`);
+            break;
+          }
+        }
+      }
+
+      // Method 3: Try to get from browser context pages
+      if (!browserbaseSessionId && stagehand.context) {
+        try {
+          const contextPages = stagehand.context.pages();
+          if (contextPages.length > 0) {
+            const page = contextPages[0];
+            // Try to extract session ID from page URL
+            const pageUrl = page.url();
+            const urlMatch = pageUrl.match(/sessions\/([a-zA-Z0-9-]+)/);
+            if (urlMatch) {
+              browserbaseSessionId = urlMatch[1];
+              console.log(`[SaaS Docs] ${sessionId}: Found session ID via page URL`);
+            }
+          }
+        } catch (pageError) {
+          console.log(`[SaaS Docs] ${sessionId}: Page method failed:`, pageError);
+        }
+      }
+
+      // Method 4: Extract from browser websocket endpoint URL if available
+      if (!browserbaseSessionId && (stagehand as any).browser) {
+        const browser = (stagehand as any).browser;
+        if (browser.wsEndpoint && typeof browser.wsEndpoint === 'function') {
+          const wsUrl = browser.wsEndpoint();
+          const sessionMatch = wsUrl.match(/sessions\/([a-zA-Z0-9-]+)/);
+          if (sessionMatch) {
+            browserbaseSessionId = sessionMatch[1];
+            console.log(`[SaaS Docs] ${sessionId}: Found session ID via WebSocket endpoint`);
+          }
+        }
+      }
+
+    } catch (error) {
+      console.log(`[SaaS Docs] ${sessionId}: Error extracting session ID:`, error);
+    }
+
+    console.log(`[SaaS Docs] ${sessionId}: Browserbase session ID: ${browserbaseSessionId}`);
+
+    // Generate live view URL with correct format: /orgs/{orgId}/{projectId}/sessions/{sessionId}
+    const orgId = process.env.BROWSERBASE_ORG_ID;
+    const projectId = process.env.BROWSERBASE_PROJECT_ID;
+
+    if (!orgId || !projectId) {
+      console.error('[SaaS Docs] Missing BROWSERBASE_ORG_ID or BROWSERBASE_PROJECT_ID');
+    }
+
+    // Only generate live view URL if we have a valid session ID
+    let liveViewUrl: string | undefined;
+    if (browserbaseSessionId && orgId && projectId) {
+      liveViewUrl = `https://www.browserbase.com/orgs/${orgId}/${projectId}/sessions/${browserbaseSessionId}`;
+      session.liveViewUrl = liveViewUrl;
+    } else {
+      console.warn(`[SaaS Docs] ${sessionId}: Cannot generate live view URL - missing session ID, org ID, or project ID`);
+      console.warn(`[SaaS Docs] ${sessionId}: SessionID: ${browserbaseSessionId}, OrgID: ${orgId}, ProjectID: ${projectId}`);
+    }
+
+    session.browserbaseSessionId = browserbaseSessionId; // Add this for user display
+
+    console.log(`[SaaS Docs] ${sessionId}: Live view URL: ${liveViewUrl}`);
     sessionStore.setSession(sessionId, session);
 
     // Task 1: Homepage Analysis
@@ -163,7 +247,7 @@ async function processDocumentationGeneration(sessionId: string, platformName: s
     );
 
     // Store documentation
-    sessionStore.setDocumentation(sessionId, documentation);
+    await sessionStore.setDocumentation(sessionId, documentation);
 
     // Update session to completed
     session.status = 'completed';
@@ -600,7 +684,7 @@ export async function GET(request: NextRequest) {
   }
 
   const session = sessionStore.getSession(sessionId);
-  const documentation = sessionStore.getDocumentation(sessionId);
+  const documentation = await sessionStore.getDocumentation(sessionId);
 
   return NextResponse.json({
     session,

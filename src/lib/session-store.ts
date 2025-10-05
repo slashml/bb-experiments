@@ -1,10 +1,10 @@
 import { SessionProgress, CompleteDocumentation } from './schemas';
+import { fileDocumentationStorage } from './file-storage';
 
 // Shared session store for the demo
 // In production, use Redis, MongoDB, or another persistent store
 class SessionStore {
   private sessionStore = new Map<string, SessionProgress>();
-  private documentationStore = new Map<string, CompleteDocumentation>();
 
   // Session progress methods
   setSession(sessionId: string, progress: SessionProgress) {
@@ -20,31 +20,34 @@ class SessionStore {
   }
 
   // Documentation methods
-  setDocumentation(sessionId: string, documentation: CompleteDocumentation) {
-    this.documentationStore.set(sessionId, documentation);
+  async setDocumentation(sessionId: string, documentation: CompleteDocumentation): Promise<void> {
+    await fileDocumentationStorage.saveDocumentation(sessionId, documentation);
   }
 
-  getDocumentation(sessionId: string): CompleteDocumentation | undefined {
-    return this.documentationStore.get(sessionId);
+  async getDocumentation(sessionId: string): Promise<CompleteDocumentation | null> {
+    return await fileDocumentationStorage.getDocumentation(sessionId);
   }
 
   // Cleanup methods
-  deleteSession(sessionId: string) {
+  async deleteSession(sessionId: string): Promise<void> {
     this.sessionStore.delete(sessionId);
-    this.documentationStore.delete(sessionId);
+    await fileDocumentationStorage.deleteDocumentation(sessionId);
   }
 
   // Clean up old sessions (older than 1 hour)
-  cleanup() {
+  async cleanup(): Promise<void> {
     const oneHourAgo = Date.now() - (60 * 60 * 1000);
 
     for (const [sessionId, session] of this.sessionStore) {
       const sessionTime = new Date(session.startTime).getTime();
       if (sessionTime < oneHourAgo) {
-        this.deleteSession(sessionId);
+        await this.deleteSession(sessionId);
         console.log(`[SessionStore] Cleaned up old session: ${sessionId}`);
       }
     }
+
+    // Also clean up old documentation files
+    await fileDocumentationStorage.cleanup(1); // 1 hour
   }
 }
 
@@ -54,6 +57,6 @@ export const sessionStore = new SessionStore();
 // Run cleanup every 30 minutes
 if (typeof window === 'undefined') { // Only on server side
   setInterval(() => {
-    sessionStore.cleanup();
+    sessionStore.cleanup().catch(console.error);
   }, 30 * 60 * 1000);
 }
